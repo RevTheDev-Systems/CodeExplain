@@ -48,6 +48,12 @@ function dshHome(): string {
   return home(".dsh");
 }
 
+function piAgentDir(): string {
+  const env = process.env.PI_CODING_AGENT_DIR;
+  if (env && env.trim() !== "") return env;
+  return home(".pi", "agent");
+}
+
 function plainEntry(launch: Launch): Record<string, unknown> {
   return { command: launch.command, args: launch.args };
 }
@@ -164,6 +170,16 @@ export const CLIENTS: McpClient[] = [
     defaultScope: "user",
     entry: plainEntry,
     snippet: dshYamlSnippet,
+  },
+  {
+    id: "pi",
+    name: "Pi",
+    format: "json",
+    key: "mcpServers",
+    userFile: () => join(piAgentDir(), "mcp.json"),
+    projectFile: ".pi/mcp.json",
+    defaultScope: "user",
+    entry: plainEntry,
   },
 ];
 

@@ -18,15 +18,19 @@ const launch: Launch = { command: "npx", args: ["-y", "code-explain", "mcp"] };
 
 let cwd: string;
 let prevDshHome: string | undefined;
+let prevPiDir: string | undefined;
 
 beforeEach(() => {
   cwd = mkdtempSync(join(tmpdir(), "ce-install-"));
   prevDshHome = process.env.DSH_HOME;
+  prevPiDir = process.env.PI_CODING_AGENT_DIR;
 });
 
 afterEach(() => {
   if (prevDshHome === undefined) delete process.env.DSH_HOME;
   else process.env.DSH_HOME = prevDshHome;
+  if (prevPiDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+  else process.env.PI_CODING_AGENT_DIR = prevPiDir;
   rmSync(cwd, { recursive: true, force: true });
 });
 
@@ -142,6 +146,31 @@ describe("buildPlan", () => {
     const plan = buildPlan({ client: "deepseek-harness", launch, write: false, force: false, cwd });
     expect(plan.path.endsWith(join(".dsh", "cordis.patch.yml"))).toBe(true);
   });
+
+  it("resolves the pi user config path under the agent directory", () => {
+    delete process.env.PI_CODING_AGENT_DIR;
+    const plan = buildPlan({ client: "pi", launch, write: false, force: false, cwd });
+    expect(plan.scope).toBe("user");
+    expect(plan.path.endsWith(join(".pi", "agent", "mcp.json"))).toBe(true);
+  });
+
+  it("honors PI_CODING_AGENT_DIR for the pi config path", () => {
+    process.env.PI_CODING_AGENT_DIR = join(cwd, "pi-agent");
+    const plan = buildPlan({ client: "pi", launch, write: false, force: false, cwd });
+    expect(plan.path).toBe(join(cwd, "pi-agent", "mcp.json"));
+  });
+
+  it("falls back to ~/.pi/agent when PI_CODING_AGENT_DIR is empty", () => {
+    process.env.PI_CODING_AGENT_DIR = "   ";
+    const plan = buildPlan({ client: "pi", launch, write: false, force: false, cwd });
+    expect(plan.path.endsWith(join(".pi", "agent", "mcp.json"))).toBe(true);
+  });
+
+  it("resolves the pi project config path under cwd", () => {
+    const plan = buildPlan({ client: "pi", scope: "project", launch, write: false, force: false, cwd });
+    expect(plan.scope).toBe("project");
+    expect(plan.path).toBe(join(cwd, ".pi", "mcp.json"));
+  });
 });
 
 describe("rendering", () => {
@@ -193,6 +222,14 @@ describe("rendering", () => {
     expect(snippet).toContain("mcpServers:");
     expect(snippet).toContain("- name: code-explain");
     expect(snippet).toContain("command: npx");
+  });
+
+  it("renders a plain mcpServers entry for pi", () => {
+    const parsed = JSON.parse(jsonSnippet(findClient("pi")!, "code-explain", launch));
+    expect(parsed.mcpServers["code-explain"]).toEqual({
+      command: "npx",
+      args: ["-y", "code-explain", "mcp"],
+    });
   });
 
   it("renders a hermes YAML map", () => {
