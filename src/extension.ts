@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
 import { languageForFile } from "./parser/treesitter.js";
 import { loadConfig, type ExplainConfig } from "./extension/config.js";
-import { CodeAnalyzer, type AnalysisResult } from "./core/explain.js";
+import { CodeAnalyzer, signatureOf, type AnalysisResult } from "./core/explain.js";
+import { selectChangedUnits } from "./core/changes.js";
+import { gitChangedRanges, isTracked } from "./core/diff.js";
 import { CodeExplainViewProvider } from "./extension/webview.js";
 import { isConfigured, explainWithProvider, type ExplainResult } from "./llm/provider.js";
 import { buildUserPrompt, SYSTEM_PROMPT } from "./llm/prompt.js";
@@ -11,7 +13,7 @@ const LANGUAGES = ["python", "javascript", "typescript", "typescriptreact", "jav
 
 interface FileState {
   result: AnalysisResult;
-  byRange: Map<string, ExplainResult>;
+  bySignature: Map<string, ExplainResult>;
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -63,25 +65,68 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       return;
     }
 
-    const byRange = new Map<string, ExplainResult>();
-    const state: FileState = { result, byRange };
+    // Structure-only on edit: keep any explanations we already have (keyed by
+    // signature so they survive line shifts) and refresh the panel immediately.
+    const prev = latest.get(fileUri);
+    const bySignature = prev?.bySignature ?? new Map<string, ExplainResult>();
+    const state: FileState = { result, bySignature };
     latest.set(fileUri, state);
 
-    if (providerEnabled()) {
-      try {
-        const expls = await analyzer!.explainFunctions(result, fileUri, config.maxConcurrent);
-        for (const u of result.units) {
-          if (u.kind !== "function") continue;
-          const sig = `${u.name ?? "anon"}:${u.params}:${u.text.length}`;
-          const r = expls.get(`${fileUri}:${sig}`);
-          if (r) byRange.set(`${u.startLine}:${u.endLine}`, r);
+    viewProvider.update(result, bySignature, doc.uri);
+    codeLensEmitter.fire();
+  }
+
+  /**
+   * On save, explain only the functions touched by the change. Falls back to
+   * all functions in the file when git cannot pinpoint the change (untracked
+   * files, non-repos, untitled buffers); repeat explanations are cache hits.
+   */
+  async function explainChanged(doc: vscode.TextDocument): Promise<void> {
+    if (!providerEnabled()) return;
+    if (vscode.window.activeTextEditor?.document !== doc) return;
+    if (!languageForFile(doc.fileName)) return;
+
+    const state = latest.get(doc.uri.toString());
+    if (!state) return;
+    const funcs = state.result.units.filter((u) => u.kind === "function");
+    if (!funcs.length) return;
+
+    let targets = funcs;
+    if (doc.uri.scheme === "file") {
+      const ranges = gitChangedRanges(doc.fileName);
+      if (ranges !== null) {
+        if (ranges.length > 0) {
+          const changed = new Set(selectChangedUnits(funcs, ranges));
+          targets = funcs.filter((u) => changed.has(u));
+        } else if (isTracked(doc.fileName)) {
+          // Tracked and clean: nothing changed since HEAD.
+          return;
         }
-      } catch (err) {
-        viewProvider.showMessage("error", `Explanation failed: ${String(err)}`);
+        // else: untracked file → explain every function.
       }
     }
+    if (!targets.length) return;
 
-    viewProvider.update(result, byRange, doc.uri);
+    const fileUri = doc.uri.toString();
+    const subset: AnalysisResult = { ...state.result, units: targets };
+    try {
+      const expls = await analyzer!.explainFunctions(subset, fileUri, config.maxConcurrent);
+      for (const u of targets) {
+        const sig = signatureOf(u);
+        const r = expls.get(`${fileUri}:${sig}`);
+        if (r) state.bySignature.set(sig, r);
+      }
+    } catch (err) {
+      viewProvider.showMessage("error", `Explanation failed: ${String(err)}`);
+      return;
+    }
+
+    const anyExpl = targets
+      .map((u) => state.bySignature.get(signatureOf(u)))
+      .find((r): r is ExplainResult => r != null);
+    if (anyExpl) state.result.providerUsed = anyExpl.provider;
+
+    viewProvider.update(state.result, state.bySignature, doc.uri);
     codeLensEmitter.fire();
   }
 
@@ -92,6 +137,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (vscode.window.activeTextEditor?.document === e.document) {
         scheduleAnalysis();
       }
+    }),
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+      void explainChanged(doc);
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("codeExplain")) {
@@ -113,7 +161,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           for (const u of state.result.units) {
             if (u.kind !== "function") continue;
             if (line >= u.startLine && line <= u.endLine) {
-              best = state.byRange.get(`${u.startLine}:${u.endLine}`) ?? null;
+              best = state.bySignature.get(signatureOf(u)) ?? null;
               break;
             }
           }
@@ -137,7 +185,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const lenses: vscode.CodeLens[] = [];
       for (const u of state.result.units) {
         if (u.kind !== "function") continue;
-        const r = state.byRange.get(`${u.startLine}:${u.endLine}`);
+        const r = state.bySignature.get(signatureOf(u));
         if (!r) continue;
         const range = new vscode.Range(
           new vscode.Position(u.startLine, 0),

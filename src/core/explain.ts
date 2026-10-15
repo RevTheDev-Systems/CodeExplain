@@ -14,7 +14,7 @@ export interface AnalysisResult {
   providerUsed: "local" | "cloud" | "none";
 }
 
-function signatureOf(unit: CodeUnit): string {
+export function signatureOf(unit: CodeUnit): string {
   if (unit.kind === "function") {
     return `${unit.name ?? "anon"}:${unit.params}:${unit.text.length}`;
   }

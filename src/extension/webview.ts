@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { AnalysisResult } from "../core/explain.js";
+import { signatureOf, type AnalysisResult } from "../core/explain.js";
 import type { ExplainResult } from "../llm/provider.js";
 
 function getNonce(): string {
@@ -65,9 +65,9 @@ export class CodeExplainViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  update(result: AnalysisResult, byRange?: Map<string, ExplainResult>, documentUri?: vscode.Uri): void {
+  update(result: AnalysisResult, bySignature?: Map<string, ExplainResult>, documentUri?: vscode.Uri): void {
     if (documentUri) this.documentUri = documentUri;
-    this.lastPayload = this.serialize(result, byRange);
+    this.lastPayload = this.serialize(result, bySignature);
     if (!this.view) return;
     void this.view.webview.postMessage({ type: "update", result: this.lastPayload });
   }
@@ -77,13 +77,13 @@ export class CodeExplainViewProvider implements vscode.WebviewViewProvider {
     void this.view.webview.postMessage({ type: "message", kind, text });
   }
 
-  private serialize(result: AnalysisResult, byRange?: Map<string, ExplainResult>): string {
+  private serialize(result: AnalysisResult, bySignature?: Map<string, ExplainResult>): string {
     return JSON.stringify({
       risks: result.risks,
       functions: result.units
         .filter((u) => u.kind === "function")
         .map((u) => {
-          const ex = byRange?.get(`${u.startLine}:${u.endLine}`);
+          const ex = bySignature?.get(signatureOf(u));
           return {
             name: u.name ?? "(anonymous)",
             startLine: u.startLine,
