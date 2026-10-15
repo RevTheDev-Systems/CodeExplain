@@ -4,6 +4,7 @@
 src/
 test/
 assets/
+.github/
 .vscodeignore
 esbuild.mjs
 tsconfig.json
