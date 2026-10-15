@@ -173,7 +173,7 @@ npx -y code-explain mcp install --client codex --write
 ```
 
 Supported clients: `claude`, `cursor`, `cline`, `windsurf`, `vscode`, `opencode`,
-`zed`, `codex`, `continue`.
+`zed`, `codex`, `continue`, `hermes`, `deepseek-harness`, `pi`, `grok`.
 
 By default `mcp install` **prints** the snippet and target path and touches nothing;
 pass `--write` to merge the entry in. Use `--force` to replace an existing entry of

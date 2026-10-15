@@ -171,6 +171,12 @@ describe("buildPlan", () => {
     expect(plan.scope).toBe("project");
     expect(plan.path).toBe(join(cwd, ".pi", "mcp.json"));
   });
+
+  it("resolves the grok user config path", () => {
+    const plan = buildPlan({ client: "grok", launch, write: false, force: false, cwd });
+    expect(plan.scope).toBe("user");
+    expect(plan.path.endsWith(join(".grok", "config.toml"))).toBe(true);
+  });
 });
 
 describe("rendering", () => {
@@ -212,6 +218,13 @@ describe("rendering", () => {
 
   it("renders a codex TOML table", () => {
     const snippet = renderSnippet(findClient("codex")!, "code-explain", launch);
+    expect(snippet).toContain("[mcp_servers.code-explain]");
+    expect(snippet).toContain('command = "npx"');
+    expect(snippet).toContain('args = ["-y", "code-explain", "mcp"]');
+  });
+
+  it("renders a grok TOML table", () => {
+    const snippet = renderSnippet(findClient("grok")!, "code-explain", launch);
     expect(snippet).toContain("[mcp_servers.code-explain]");
     expect(snippet).toContain('command = "npx"');
     expect(snippet).toContain('args = ["-y", "code-explain", "mcp"]');

@@ -181,6 +181,15 @@ export const CLIENTS: McpClient[] = [
     defaultScope: "user",
     entry: plainEntry,
   },
+  {
+    id: "grok",
+    name: "Grok CLI",
+    format: "toml",
+    key: "mcp_servers",
+    userFile: () => home(".grok", "config.toml"),
+    defaultScope: "user",
+    entry: plainEntry,
+  },
 ];
 
 export function findClient(id: string): McpClient | undefined {
