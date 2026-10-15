@@ -39,7 +39,8 @@ const builds = [
     ...common,
     entryPoints: ["src/mcp/server.ts"],
     outfile: "dist/mcp.cjs",
-    banner: { js: "// CodeExplain MCP server bundle" },
+    // This file is also the `code-explain-mcp` bin, so it needs a shebang.
+    banner: { js: "#!/usr/bin/env node\n// CodeExplain MCP server bundle" },
   },
 ];
 

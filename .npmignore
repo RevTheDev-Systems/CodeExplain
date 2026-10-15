@@ -1,0 +1,15 @@
+# npm ships built output plus docs; sources, tests and tooling stay out.
+# (vsce uses .vscodeignore; npm uses this file. Do not add a "files" field to
+# package.json: a package cannot ship both a "files" allowlist and .vscodeignore.)
+src/
+test/
+assets/
+.vscodeignore
+esbuild.mjs
+tsconfig.json
+*.vsix
+*.tgz
+.gitignore
+
+# Source maps are for local debugging, not consumers.
+*.map

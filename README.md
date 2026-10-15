@@ -2,7 +2,7 @@
 
 Explain code in plain language as it's being written — so non-technical people can actually understand what vibe-coded apps do.
 
-CodeExplain is a harness that watches Python, JavaScript, and TypeScript source and translates it into human-readable explanations. It's being built as a VS Code extension, but the core logic is a standalone, testable TypeScript library so it can be reused and verified on its own.
+CodeExplain is a harness that watches Python, JavaScript, and TypeScript source and translates it into human-readable explanations. It ships as a VS Code extension **and** as an MCP server + CLI for coding agents, sharing one standalone, testable TypeScript core.
 
 ## What it does
 
@@ -53,12 +53,32 @@ Phase 3 — beautiful panel & packaging:
 - [x] Click a card to jump to its line; risk cards show the matched snippet
 - [x] Package a `.vsix` (`npm run package`) for manual install
 
+Phase 4 — agent plug-in (MCP):
+- [x] MCP stdio server (`code-explain mcp`) exposing `list_functions`,
+      `scan_risks`, `explain_code`, and `explain_changes`
+- [x] `explain_changes` derives `git diff HEAD` ranges when none are supplied
+- [x] One-command client setup: `code-explain mcp install --client <id>`
+
+Phase 5 — explain only what changed:
+- [x] On save, the extension re-explains only the functions touching changed
+      lines (structure + risks still update live while typing)
+- [x] Explanations cached by function signature, so repeat saves are free
+
+Phase 6 — distribution:
+- [x] `mcp install` prints/writes config for 9 agents (no file touched unless
+      `--write`); `--local` launches a local build without publishing
+- [x] Lean npm package (built `dist/` + docs) with executable `bin` entries
+
 ## Using the extension
 
 Open the **CodeExplain** view in the activity bar (rocket icon) to see live
 explanations for the active file. Hover a function or use its CodeLens for a
 quick summary, or run **CodeExplain: Explain selection** from the Command
 Palette / right-click menu.
+
+While you type, the panel refreshes the function list and risk alerts live (no model
+call). When you **save**, CodeExplain runs `git diff` and explains only the functions
+you actually changed — so summaries stay fast and never re-explain untouched code.
 
 The panel uses a self-contained dark, premium glass theme (no external assets),
 so it looks the same under any VS Code color theme and honors
@@ -78,6 +98,54 @@ Key settings (all under `codeExplain.*`):
 | `explain.maxConcurrent` | `2` | Max parallel explanation calls |
 | `explain.showRisks` | `true` | Show offline risk alerts |
 
+## Use it from your coding agent (MCP)
+
+CodeExplain also runs as a [Model Context Protocol](https://modelcontextprotocol.io)
+server over stdio, so a coding agent can ask it to explain files without leaving the
+chat. One server, four tools:
+
+| Tool | Model needed | What it returns |
+|---|---|---|
+| `list_functions` | no | Functions, assignments, and imports with line ranges |
+| `scan_risks` | no | Instant, offline risk alerts |
+| `explain_code` | yes | A plain-language summary of every function in a file |
+| `explain_changes` | yes | Summaries for only the functions touching changed lines |
+
+`explain_changes` takes an optional `changed` list of `{startLine, endLine}` ranges
+(0-based, inclusive); when omitted it derives them from `git diff HEAD` for that file.
+Each tool accepts `format: "text" | "json"`.
+
+### One-command setup
+
+```sh
+# See which agents CodeExplain can configure
+npx -y code-explain mcp install --list
+
+# Preview the exact config for your agent (prints, never edits a file)
+npx -y code-explain mcp install --client cursor --scope project
+
+# Write it in place
+npx -y code-explain mcp install --client codex --write
+```
+
+Supported clients: `claude`, `cursor`, `cline`, `windsurf`, `vscode`, `opencode`,
+`zed`, `codex`, `continue`.
+
+By default `mcp install` **prints** the snippet and target path and touches nothing;
+pass `--write` to merge the entry in. Use `--force` to replace an existing entry of
+the same name, `--scope user|project` to choose where it lands, and
+`--local /path/to/dist/cli.js` to launch a local build with `node` instead of `npx`
+(handy before you publish). If your agent isn't listed, run without `--write` and
+paste the printed snippet yourself.
+
+### Running the server directly
+
+```sh
+npx -y code-explain mcp        # start the stdio server
+```
+
+> stdout is the JSON-RPC channel — the server only ever writes logs to stderr.
+
 ## Development
 
 ```sh
@@ -86,6 +154,10 @@ npm run build            # type-check + emit library (tsc)
 npm run build:extension  # bundle the extension (esbuild → dist/extension.cjs)
 npm test                 # vitest
 npm run explain -- test/fixtures/app.py [--llm]
+
+node dist/cli.js mcp                                # run the MCP stdio server
+node dist/cli.js mcp install --client cursor        # preview a client config
+npm run package                                     # build code-explain-<version>.vsix
 ```
 
 The extension bundle is CommonJS (`dist/extension.cjs`) so it loads on VS Code

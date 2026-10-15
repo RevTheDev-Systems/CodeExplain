@@ -117,12 +117,14 @@
   },
   "bin": {
     "codexplain": "dist/cli.js",
+    "code-explain": "dist/cli.js",
     "code-explain-mcp": "dist/mcp.cjs"
   },
   "scripts": {
     "build": "tsc",
     "build:extension": "node esbuild.mjs",
     "vscode:prepublish": "node esbuild.mjs",
+    "prepublishOnly": "npm run build && node esbuild.mjs",
     "test": "vitest run",
     "explain": "tsx src/cli.ts",
     "package": "vsce package --allow-missing-repository --skip-license"

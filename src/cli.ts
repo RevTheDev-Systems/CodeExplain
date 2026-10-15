@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { languageForFile, parse } from "./parser/treesitter.js";
 import { extractCodeUnits } from "./parser/extract.js";
@@ -36,6 +37,11 @@ function severityLabel(severity: string): string {
 }
 
 export async function main(argv: string[]): Promise<number> {
+  if (argv[2] === "mcp" && argv[3] === "install") {
+    const { runInstall } = await import("./mcp/install.js");
+    return runInstall(argv.slice(4));
+  }
+
   if (argv[2] === "mcp") {
     const { runServer } = await import("./mcp/server.js");
     await runServer();
@@ -46,7 +52,8 @@ export async function main(argv: string[]): Promise<number> {
 
   if (args.files.length === 0) {
     console.error("Usage: explain <file.py|.js|.ts> [--llm]");
-    console.error("       explain mcp   # start the MCP stdio server");
+    console.error("       explain mcp           # start the MCP stdio server");
+    console.error("       explain mcp install   # configure an MCP client");
     return 1;
   }
 
