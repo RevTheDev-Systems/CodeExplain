@@ -36,10 +36,17 @@ function severityLabel(severity: string): string {
 }
 
 export async function main(argv: string[]): Promise<number> {
+  if (argv[2] === "mcp") {
+    const { runServer } = await import("./mcp/server.js");
+    await runServer();
+    return 0;
+  }
+
   const args = parseArgs(argv.slice(2));
 
   if (args.files.length === 0) {
     console.error("Usage: explain <file.py|.js|.ts> [--llm]");
+    console.error("       explain mcp   # start the MCP stdio server");
     return 1;
   }
 

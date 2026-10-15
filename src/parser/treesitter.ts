@@ -26,24 +26,35 @@ function grammarWasmPath(kind: LanguageKind): string {
 
 const baseWasmPath = require.resolve("web-tree-sitter/web-tree-sitter.wasm");
 
-let initialized = false;
-const languages = new Map<LanguageKind, Language>();
+// Cache the in-flight promise, not the resolved value, so concurrent callers
+// await the same initialization instead of racing to start it twice.
+let initPromise: Promise<void> | null = null;
+const languagePromises = new Map<LanguageKind, Promise<Language>>();
 
 export async function initParser(): Promise<void> {
-  if (initialized) return;
-  await Parser.init({ locateFile: () => baseWasmPath });
-  initialized = true;
+  if (!initPromise) {
+    initPromise = Parser.init({ locateFile: () => baseWasmPath }).catch((err) => {
+      initPromise = null;
+      throw err;
+    });
+  }
+  return initPromise;
 }
 
 export async function getLanguage(kind: LanguageKind): Promise<Language> {
   await initParser();
-  let lang = languages.get(kind);
-  if (!lang) {
-    const bytes = readFileSync(grammarWasmPath(kind));
-    lang = await Language.load(bytes);
-    languages.set(kind, lang);
+  let langPromise = languagePromises.get(kind);
+  if (!langPromise) {
+    langPromise = (async () => {
+      const bytes = readFileSync(grammarWasmPath(kind));
+      return Language.load(bytes);
+    })().catch((err) => {
+      languagePromises.delete(kind);
+      throw err;
+    });
+    languagePromises.set(kind, langPromise);
   }
-  return lang;
+  return langPromise;
 }
 
 export function newParser(): Parser {

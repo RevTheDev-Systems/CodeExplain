@@ -10,26 +10,42 @@ const external = [
   "tree-sitter-python",
   "tree-sitter-javascript",
   "tree-sitter-typescript",
+  "@modelcontextprotocol/sdk",
+  "@modelcontextprotocol/sdk/*",
 ];
 
-await esbuild.build({
-  entryPoints: ["src/extension.ts"],
+// The source uses createRequire(import.meta.url); CJS has no import.meta,
+// so substitute the real CJS filename (esbuild's cjs output provides __filename).
+const common = {
   bundle: true,
-  outfile: "dist/extension.cjs",
   format: "cjs",
   platform: "node",
   external,
   sourcemap: true,
   target: "node18",
-  // The source uses createRequire(import.meta.url); CJS has no import.meta,
-  // so substitute the real CJS filename (esbuild's cjs output provides __filename).
   define: {
     "import.meta.url": "__filename",
   },
-  banner: {
-    js: "// CodeExplain extension bundle",
+};
+
+const builds = [
+  {
+    ...common,
+    entryPoints: ["src/extension.ts"],
+    outfile: "dist/extension.cjs",
+    banner: { js: "// CodeExplain extension bundle" },
   },
-}).catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+  {
+    ...common,
+    entryPoints: ["src/mcp/server.ts"],
+    outfile: "dist/mcp.cjs",
+    banner: { js: "// CodeExplain MCP server bundle" },
+  },
+];
+
+for (const options of builds) {
+  await esbuild.build(options).catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

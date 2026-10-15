@@ -116,7 +116,8 @@
     }
   },
   "bin": {
-    "codexplain": "dist/cli.js"
+    "codexplain": "dist/cli.js",
+    "code-explain-mcp": "dist/mcp.cjs"
   },
   "scripts": {
     "build": "tsc",
@@ -127,6 +128,7 @@
     "package": "vsce package --allow-missing-repository --skip-license"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "tree-sitter-javascript": "^0.25.0",
     "tree-sitter-python": "^0.25.0",
     "tree-sitter-typescript": "^0.23.2",
