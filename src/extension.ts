@@ -5,6 +5,9 @@ import { CodeAnalyzer, type AnalysisResult } from "./extension/analyzer.js";
 import { CodeExplainViewProvider } from "./extension/webview.js";
 import { isConfigured, explainWithProvider, type ExplainResult } from "./llm/provider.js";
 import { buildUserPrompt, SYSTEM_PROMPT } from "./llm/prompt.js";
+import type { CodeUnit } from "./parser/extract.js";
+
+const LANGUAGES = ["python", "javascript", "typescript", "typescriptreact", "javascriptreact"];
 
 interface FileState {
   result: AnalysisResult;
@@ -15,6 +18,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let config: ExplainConfig = loadConfig();
   let analyzer: CodeAnalyzer | null = null;
   const latest = new Map<string, FileState>();
+
+  // Fired when cached explanations change so CodeLens lenses refresh promptly.
+  const codeLensEmitter = new vscode.EventEmitter<void>();
+  context.subscriptions.push(codeLensEmitter);
 
   const viewProvider = new CodeExplainViewProvider(context.extensionUri);
   context.subscriptions.push(
@@ -69,13 +76,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           const r = expls.get(`${fileUri}:${sig}`);
           if (r) byRange.set(`${u.startLine}:${u.endLine}`, r);
         }
-        state.result = result;
       } catch (err) {
         viewProvider.showMessage("error", `Explanation failed: ${String(err)}`);
       }
     }
 
     viewProvider.update(result, byRange);
+    codeLensEmitter.fire();
   }
 
   // --- watchers (debounced) ---
@@ -95,7 +102,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 
   // --- hover provider: show cached explanation under the cursor ---
-  for (const lang of ["python", "javascript", "typescript", "typescriptreact", "javascriptreact"]) {
+  for (const lang of LANGUAGES) {
     context.subscriptions.push(
       vscode.languages.registerHoverProvider(lang, {
         provideHover(doc, pos) {
@@ -122,80 +129,90 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   // --- CodeLens: show summary above functions ---
-  for (const lang of ["python", "javascript", "typescript", "typescriptreact", "javascriptreact"]) {
+  const codeLensProvider: vscode.CodeLensProvider = {
+    onDidChangeCodeLenses: codeLensEmitter.event,
+    provideCodeLenses(doc): vscode.CodeLens[] {
+      const state = latest.get(doc.uri.toString());
+      if (!state) return [];
+      const lenses: vscode.CodeLens[] = [];
+      for (const u of state.result.units) {
+        if (u.kind !== "function") continue;
+        const r = state.byRange.get(`${u.startLine}:${u.endLine}`);
+        if (!r) continue;
+        const range = new vscode.Range(
+          new vscode.Position(u.startLine, 0),
+          new vscode.Position(u.startLine, 0)
+        );
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: r.summary,
+            command: "codeExplain.explainSelection",
+            arguments: [u],
+          })
+        );
+      }
+      return lenses;
+    },
+  };
+  for (const lang of LANGUAGES) {
     context.subscriptions.push(
-      vscode.languages.registerCodeLensProvider(lang, {
-        provideCodeLenses(doc): vscode.CodeLens[] {
-          const state = latest.get(doc.uri.toString());
-          if (!state) return [];
-          const lenses: vscode.CodeLens[] = [];
-          for (const u of state.result.units) {
-            if (u.kind !== "function") continue;
-            const r = state.byRange.get(`${u.startLine}:${u.endLine}`);
-            if (!r) continue;
-            const range = new vscode.Range(
-              new vscode.Position(u.startLine, 0),
-              new vscode.Position(u.startLine, 0)
-            );
-            lenses.push(
-              new vscode.CodeLens(range, {
-                title: r.summary,
-                command: "codeExplain.explainSelection",
-                arguments: [u],
-              })
-            );
-          }
-          return lenses;
-        },
-      })
+      vscode.languages.registerCodeLensProvider(lang, codeLensProvider)
     );
   }
 
-  // --- on-demand: explain the selected code ---
-  const explainSel = vscode.commands.registerCommand("codeExplain.explainSelection", async () => {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) return;
-    const selection = editor.selection;
-    const text = editor.document.getText(selection);
-    if (!text.trim()) return;
-    const kind = languageForFile(editor.document.fileName);
-    if (!kind) return;
+  // --- on-demand: explain the CodeLens target or the selected code ---
+  const explainSel = vscode.commands.registerCommand(
+    "codeExplain.explainSelection",
+    async (unit?: CodeUnit) => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
 
-    const unit = {
-      kind: "function" as const,
-      name: "selected code",
-      params: "",
-      startLine: selection.start.line,
-      endLine: selection.end.line,
-      startIndex: 0,
-      endIndex: text.length,
-      isAsync: false,
-      isMethod: false,
-      text,
-      language: kind,
-    };
+      let target: CodeUnit;
+      if (unit && unit.kind === "function") {
+        target = unit;
+      } else {
+        const selection = editor.selection;
+        const text = editor.document.getText(selection);
+        if (!text.trim()) return;
+        const kind = languageForFile(editor.document.fileName);
+        if (!kind) return;
+        target = {
+          kind: "function",
+          name: "selected code",
+          params: "",
+          startLine: selection.start.line,
+          endLine: selection.end.line,
+          startIndex: 0,
+          endIndex: text.length,
+          isAsync: false,
+          isMethod: false,
+          text,
+          language: kind,
+        };
+      }
 
-    const messages = [
-      { role: "system" as const, content: SYSTEM_PROMPT },
-      {
-        role: "user" as const,
-        content: buildUserPrompt({ unit, language: kind, context: "" }),
-      },
-    ];
+      const messages = [
+        { role: "system" as const, content: SYSTEM_PROMPT },
+        {
+          role: "user" as const,
+          content: buildUserPrompt({ unit: target, language: target.language, context: "" }),
+        },
+      ];
 
-    let result: ExplainResult;
-    try {
-      result = await explainWithProvider(config.provider, messages);
-    } catch (err) {
-      vscode.window.showErrorMessage(`CodeExplain: ${String(err)}`);
-      return;
+      let result: ExplainResult;
+      try {
+        result = await explainWithProvider(config.provider, messages);
+      } catch (err) {
+        vscode.window.showErrorMessage(`CodeExplain: ${String(err)}`);
+        return;
+      }
+
+      void vscode.window.showInformationMessage(
+        `CodeExplain (${result.provider}): ${result.summary}${result.risk !== "none" ? ` — ${result.risk}` : ""}`,
+        { modal: false }
+      );
     }
-
-    void vscode.window.showInformationMessage(
-      `CodeExplain (${result.provider}): ${result.summary}${result.risk !== "none" ? ` — ${result.risk}` : ""}`,
-      { modal: false }
-    );
-  });
+  );
   context.subscriptions.push(explainSel);
 
   // kick off an initial analysis
