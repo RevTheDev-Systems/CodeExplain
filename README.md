@@ -1,5 +1,7 @@
 # CodeExplain
 
+CI: [GitHub Actions](https://github.com/RevTheDev-Systems/CodeExplain/actions/workflows/ci.yml)
+
 Explain code in plain language as it's being written — so non-technical people can actually understand what vibe-coded apps do.
 
 CodeExplain is a harness that watches Python, JavaScript, and TypeScript source and translates it into human-readable explanations. It ships as a VS Code extension **and** as an MCP server + CLI for coding agents, sharing one standalone, testable TypeScript core.
@@ -213,3 +215,9 @@ loader. Press <kbd>F5</kbd> in VS Code to launch an Extension Development Host.
 - Real-time means *debounced*, not every keystroke — trigger after a short pause and cancel in-flight calls if the user keeps typing.
 - Only summarize functions that actually changed; cache by (file + function-signature) hash; cap concurrent calls.
 - For private code, prefer the local model so source never leaves the machine.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+Copyright (c) 2026 RevTheDev Systems.
