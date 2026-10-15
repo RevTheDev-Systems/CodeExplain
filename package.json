@@ -1,15 +1,129 @@
 {
   "name": "code-explain",
-  "version": "0.1.0",
+  "displayName": "CodeExplain",
   "description": "Explain code in plain language as it's being written",
+  "version": "0.2.0",
+  "publisher": "revenueroy",
   "type": "module",
+  "main": "./dist/extension.cjs",
+  "engines": {
+    "vscode": "^1.86.0"
+  },
+  "activationEvents": [
+    "onLanguage:python",
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact",
+    "onCommand:codeExplain.explainSelection"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeExplain.explainSelection",
+        "title": "CodeExplain: Explain selection",
+        "icon": "$(lightbulb)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codeExplain.explainSelection",
+          "when": "editorHasSelection"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codeExplain",
+          "title": "CodeExplain",
+          "icon": "$(rocket)"
+        }
+      ]
+    },
+    "views": {
+      "codeExplain": [
+        {
+          "type": "webview",
+          "id": "codeExplain.panel",
+          "name": "Live Code Explanations"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeExplain",
+      "properties": {
+        "codeExplain.provider.mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "local",
+            "cloud"
+          ],
+          "enumDescriptions": [
+            "Try the local model first, fall back to cloud if unavailable.",
+            "Use only the local Ollama-compatible server.",
+            "Use only the cloud OpenAI-compatible endpoint."
+          ],
+          "default": "auto",
+          "markdownDescription": "Which model backend explains your code."
+        },
+        "codeExplain.provider.localModel": {
+          "type": "string",
+          "default": "llama3.1",
+          "markdownDescription": "Local model name (e.g. `llama3.1`, `qwen2.5-coder`)."
+        },
+        "codeExplain.provider.localBaseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:11434/v1",
+          "markdownDescription": "Base URL of your local OpenAI-compatible server (Ollama default)."
+        },
+        "codeExplain.provider.cloudApiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "API key for the cloud endpoint. Stored in your settings; prefer `CODE_EXPLAIN_CLOUD_API_KEY` in a secret store when possible."
+        },
+        "codeExplain.provider.cloudBaseUrl": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "markdownDescription": "Base URL of the cloud OpenAI-compatible endpoint."
+        },
+        "codeExplain.provider.cloudModel": {
+          "type": "string",
+          "default": "gpt-4o-mini",
+          "markdownDescription": "Cloud model name."
+        },
+        "codeExplain.explain.debounceMs": {
+          "type": "number",
+          "default": 1500,
+          "minimum": 200,
+          "markdownDescription": "Idle time (ms) after typing before code is re-analyzed."
+        },
+        "codeExplain.explain.maxConcurrent": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "markdownDescription": "Maximum number of functions explained in parallel."
+        },
+        "codeExplain.explain.showRisks": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show instant, non-LLM risk alerts (destructive SQL, file deletion, shell, etc.)."
+        }
+      }
+    }
+  },
   "bin": {
     "codexplain": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
+    "build:extension": "node esbuild.mjs",
+    "vscode:prepublish": "node esbuild.mjs",
     "test": "vitest run",
-    "explain": "tsx src/cli.ts"
+    "explain": "tsx src/cli.ts",
+    "package": "vsce package"
   },
   "dependencies": {
     "tree-sitter-javascript": "^0.25.0",
@@ -19,6 +133,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.5.0",
+    "@types/vscode": "^1.86.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.23.1",
     "tsx": "^4.19.1",
     "typescript": "^5.5.4",
     "vitest": "^2.1.1"
