@@ -4,6 +4,7 @@
   "description": "Explain code in plain language as it's being written",
   "version": "0.2.0",
   "publisher": "revenueroy",
+  "icon": "assets/icon.png",
   "type": "module",
   "main": "./dist/extension.cjs",
   "engines": {
@@ -38,7 +39,7 @@
         {
           "id": "codeExplain",
           "title": "CodeExplain",
-          "icon": "$(rocket)"
+          "icon": "assets/icon-activitybar.svg"
         }
       ]
     },

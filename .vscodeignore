@@ -1,6 +1,8 @@
 # Build tooling and sources are not needed at runtime.
 src/**
 test/**
+# Only the Marketplace-sized icon ships; the 512px copy is for docs/panels.
+assets/icon-512.png
 tsconfig.json
 esbuild.mjs
 .gitignore
