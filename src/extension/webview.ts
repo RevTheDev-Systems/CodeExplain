@@ -24,7 +24,12 @@ export class CodeExplainViewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [this.extensionUri],
     };
-    view.webview.html = this.html(getNonce());
+    view.webview.html = this.html(getNonce(), {
+      icon: view.webview
+        .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "assets", "icon.png"))
+        .toString(),
+      csp: view.webview.cspSource,
+    });
 
     // The view may be created after analysis ran; replay the last result once
     // the webview signals it is ready.
@@ -93,12 +98,12 @@ export class CodeExplainViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private html(nonce: string): string {
+  private html(nonce: string, assets: { icon: string; csp: string }): string {
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${assets.csp} data:; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
 <style nonce="${nonce}">
   :root {
     --bg-0: #08080b;
@@ -185,13 +190,11 @@ export class CodeExplainViewProvider implements vscode.WebviewViewProvider {
     overflow: hidden;
   }
   .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .mark {
+  .logo {
     width: 30px; height: 30px; flex: none;
-    display: grid; place-items: center;
-    border-radius: 10px;
-    font-size: 15px; color: #fff;
-    background: linear-gradient(150deg, var(--accent), var(--accent-2));
-    box-shadow: 0 4px 14px rgba(139,140,255,0.45), inset 0 1px 0 rgba(255,255,255,0.4);
+    border-radius: 9px;
+    object-fit: cover;
+    box-shadow: 0 4px 14px rgba(139,140,255,0.45), inset 0 0 0 1px rgba(255,255,255,0.14);
   }
   .titles { display: flex; flex-direction: column; min-width: 0; }
   .title { font-weight: 650; letter-spacing: 0.2px; }
@@ -323,11 +326,11 @@ export class CodeExplainViewProvider implements vscode.WebviewViewProvider {
     margin-top: 8px;
   }
   .empty-mark {
-    width: 44px; height: 44px; margin: 0 auto 12px;
-    display: grid; place-items: center;
-    border-radius: 14px; font-size: 20px; color: #fff;
-    background: linear-gradient(150deg, rgba(139,140,255,0.9), rgba(90,209,200,0.9));
-    box-shadow: 0 8px 24px rgba(139,140,255,0.40), inset 0 1px 0 rgba(255,255,255,0.4);
+    width: 56px; height: 56px; margin: 0 auto 12px;
+    display: block;
+    border-radius: 16px;
+    object-fit: cover;
+    box-shadow: 0 8px 24px rgba(139,140,255,0.40);
   }
   .empty-title { font-weight: 600; letter-spacing: 0.2px; }
   .empty-sub { color: var(--muted); margin-top: 5px; line-height: 1.5; }
@@ -348,7 +351,7 @@ export class CodeExplainViewProvider implements vscode.WebviewViewProvider {
 <body>
   <header class="topbar glass">
     <div class="brand">
-      <span class="mark">◈</span>
+      <img class="logo" src="${assets.icon}" alt="" />
       <div class="titles">
         <span class="title">CodeExplain</span>
         <span class="subtitle">plain-language code reader</span>
@@ -363,6 +366,7 @@ const vscode = acquireVsCodeApi();
 const root = document.getElementById("root");
 const bannerSlot = document.getElementById("banner");
 const providerPill = document.getElementById("provider");
+const ICON = "${assets.icon}";
 
 const LABEL = { high: "Danger", medium: "Caution", low: "Note" };
 const SEV = { high: "danger", medium: "warn", low: "info" };
@@ -452,7 +456,11 @@ function funcCard(f) {
 
 function emptyState() {
   const box = el("div", "empty glass");
-  box.append(el("div", "empty-mark", "◈"));
+  const mark = document.createElement("img");
+  mark.className = "empty-mark";
+  mark.src = ICON;
+  mark.alt = "";
+  box.append(mark);
   box.append(el("div", "empty-title", "Nothing to explain yet"));
   box.append(el("div", "empty-sub", "Open a Python, JavaScript, or TypeScript file and start typing."));
   return box;
