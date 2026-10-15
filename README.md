@@ -34,11 +34,11 @@ Two kinds of analysis:
 ## Build order / status
 
 Phase 1 — testable core (current):
-- [ ] Parser + extractor (tree-sitter)
-- [ ] Risk analyzer (offline rules)
-- [ ] LLM provider (local → cloud fallback) + prompt builder
-- [ ] Demo CLI: `explain <file.py|.js|.ts>` prints summaries + risk warnings
-- [ ] Unit tests (vitest)
+- [x] Parser + extractor (tree-sitter)
+- [x] Risk analyzer (offline rules)
+- [x] LLM provider (local → cloud fallback) + prompt builder
+- [x] Demo CLI: `explain <file.py|.js|.ts>` prints summaries + risk warnings
+- [x] Unit tests (vitest)
 
 Phase 2 — VS Code extension (later):
 - [ ] Debounced watcher (~1.5s after typing)
