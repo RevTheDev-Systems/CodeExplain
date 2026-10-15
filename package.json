@@ -123,7 +123,7 @@
     "vscode:prepublish": "node esbuild.mjs",
     "test": "vitest run",
     "explain": "tsx src/cli.ts",
-    "package": "vsce package"
+    "package": "vsce package --allow-missing-repository --skip-license"
   },
   "dependencies": {
     "tree-sitter-javascript": "^0.25.0",

@@ -81,7 +81,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }
 
-    viewProvider.update(result, byRange);
+    viewProvider.update(result, byRange, doc.uri);
     codeLensEmitter.fire();
   }
 

@@ -47,12 +47,22 @@ Phase 2 — VS Code extension:
 - [x] On-demand command ("CodeExplain: Explain selection", also in the editor context menu)
 - [x] Settings (`codeExplain.*`) and a loadable CommonJS bundle
 
+Phase 3 — beautiful panel & packaging:
+- [x] Premium dark "liquid glass" sidebar design (translucent cards, specular
+      highlights, drifting aurora backdrop, staggered entrance motion)
+- [x] Click a card to jump to its line; risk cards show the matched snippet
+- [x] Package a `.vsix` (`npm run package`) for manual install
+
 ## Using the extension
 
 Open the **CodeExplain** view in the activity bar (rocket icon) to see live
 explanations for the active file. Hover a function or use its CodeLens for a
 quick summary, or run **CodeExplain: Explain selection** from the Command
 Palette / right-click menu.
+
+The panel uses a self-contained dark, premium glass theme (no external assets),
+so it looks the same under any VS Code color theme and honors
+`prefers-reduced-motion`.
 
 Key settings (all under `codeExplain.*`):
 
