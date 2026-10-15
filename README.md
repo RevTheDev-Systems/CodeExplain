@@ -33,18 +33,54 @@ Two kinds of analysis:
 
 ## Build order / status
 
-Phase 1 — testable core (current):
+Phase 1 — testable core:
 - [x] Parser + extractor (tree-sitter)
 - [x] Risk analyzer (offline rules)
 - [x] LLM provider (local → cloud fallback) + prompt builder
 - [x] Demo CLI: `explain <file.py|.js|.ts>` prints summaries + risk warnings
 - [x] Unit tests (vitest)
 
-Phase 2 — VS Code extension (later):
-- [ ] Debounced watcher (~1.5s after typing)
-- [ ] Sidebar webview panel
-- [ ] Inline hover + CodeLens
-- [ ] On-demand command
+Phase 2 — VS Code extension:
+- [x] Debounced watcher (~1.5s after typing)
+- [x] Sidebar webview panel (per-function summaries + risk alerts)
+- [x] Inline hover + CodeLens
+- [x] On-demand command ("CodeExplain: Explain selection", also in the editor context menu)
+- [x] Settings (`codeExplain.*`) and a loadable CommonJS bundle
+
+## Using the extension
+
+Open the **CodeExplain** view in the activity bar (rocket icon) to see live
+explanations for the active file. Hover a function or use its CodeLens for a
+quick summary, or run **CodeExplain: Explain selection** from the Command
+Palette / right-click menu.
+
+Key settings (all under `codeExplain.*`):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `provider.mode` | `auto` | `auto` (local, then cloud), `local`, or `cloud` |
+| `provider.localBaseUrl` | `http://127.0.0.1:11434/v1` | Local OpenAI-compatible server (Ollama) |
+| `provider.localModel` | `llama3.1` | Local model name |
+| `provider.cloudBaseUrl` | `https://api.openai.com/v1` | Cloud endpoint |
+| `provider.cloudModel` | `gpt-4o-mini` | Cloud model name |
+| `provider.cloudApiKey` | *(empty)* | Needed only in `cloud` mode |
+| `explain.debounceMs` | `1500` | Idle time before re-analysis |
+| `explain.maxConcurrent` | `2` | Max parallel explanation calls |
+| `explain.showRisks` | `true` | Show offline risk alerts |
+
+## Development
+
+```sh
+npm install
+npm run build            # type-check + emit library (tsc)
+npm run build:extension  # bundle the extension (esbuild → dist/extension.cjs)
+npm test                 # vitest
+npm run explain -- test/fixtures/app.py [--llm]
+```
+
+The extension bundle is CommonJS (`dist/extension.cjs`) so it loads on VS Code
+`^1.86.0`; `esbuild` maps `import.meta.url` to `__filename` for the tree-sitter
+loader. Press <kbd>F5</kbd> in VS Code to launch an Extension Development Host.
 
 ## Roadmap notes
 
