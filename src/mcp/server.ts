@@ -23,6 +23,7 @@ import {
 import { buildUserPrompt, SYSTEM_PROMPT, MAX_CONTEXT_CHARS } from "../llm/prompt.js";
 import { resolveConfig } from "../core/config.js";
 import { selectChangedUnits, type ChangedRange } from "../core/changes.js";
+import { gitChangedRanges, isTracked } from "../core/diff.js";
 
 // Kept in sync with package.json "version".
 const VERSION = "0.2.0";
@@ -84,7 +85,7 @@ const TOOL_DEFS: ToolDef[] = [
   {
     name: "explain_changes",
     description:
-      "Explain only the functions overlapping the given changed line ranges. Requires a configured local or cloud model.",
+      "Explain only the functions overlapping changed lines. If `changed` is omitted, the changed ranges are derived from `git diff HEAD` for that file. Requires a configured local or cloud model.",
     inputSchema: {
       type: "object",
       properties: {
@@ -92,7 +93,8 @@ const TOOL_DEFS: ToolDef[] = [
         format: FORMAT_PROP,
         changed: {
           type: "array",
-          description: "Changed line ranges (0-based, inclusive).",
+          description:
+            "Changed line ranges (0-based, inclusive). Omit to derive them from git.",
           items: {
             type: "object",
             properties: {
@@ -104,7 +106,7 @@ const TOOL_DEFS: ToolDef[] = [
           },
         },
       },
-      required: ["path", "changed"],
+      required: ["path"],
       additionalProperties: false,
     },
   },
@@ -333,7 +335,26 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<str
     }
     case "explain_changes": {
       const config = resolveConfig();
-      const changed = changedArg(args);
+      let changed = changedArg(args);
+      let note = "Changed functions only (from provided ranges).";
+
+      if (changed.length === 0) {
+        const ranges = gitChangedRanges(loaded.path);
+        if (ranges === null) {
+          return `No changed ranges provided and git is unavailable for ${loaded.path}. Pass "changed" ranges explicitly, or run inside a git repository.`;
+        }
+        if (ranges.length > 0) {
+          changed = ranges;
+          note = "Changed functions only (from git diff HEAD).";
+        } else if (!isTracked(loaded.path)) {
+          const lineCount = loaded.source.split("\n").length;
+          changed = [{ startLine: 0, endLine: Math.max(0, lineCount - 1) }];
+          note = "Untracked file: explaining all functions.";
+        } else {
+          return `No changes in ${loaded.path} since HEAD.`;
+        }
+      }
+
       const targets = selectChangedUnits(loaded.units, changed).filter(
         (u): u is FunctionInfo => u.kind === "function"
       );
@@ -342,9 +363,15 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<str
       }
       const { rows, providerUsed } = await explainUnits(loaded, targets, config.provider);
       if (format === "json") {
-        return toJson({ path: loaded.path, language: loaded.language, provider: providerUsed, explanations: rows });
+        return toJson({
+          path: loaded.path,
+          language: loaded.language,
+          provider: providerUsed,
+          changed,
+          explanations: rows,
+        });
       }
-      return renderExplanations(loaded, rows, providerUsed, "Changed functions only.");
+      return renderExplanations(loaded, rows, providerUsed, note);
     }
     default:
       throw new Error(`Unknown tool: ${name}`);

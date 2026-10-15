@@ -43,3 +43,4 @@ export {
   type ExplainSourceOptions,
 } from "./core/explain.js";
 export { selectChangedUnits, type ChangedRange } from "./core/changes.js";
+export { parseUnifiedDiff, gitChangedRanges, isTracked } from "./core/diff.js";
