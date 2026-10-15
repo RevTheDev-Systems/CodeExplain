@@ -2,7 +2,7 @@ import type { LanguageKind } from "../parser/treesitter.js";
 import type { CodeUnit } from "../parser/extract.js";
 import type { RiskFinding } from "../analyzer/risks.js";
 import type { ExplainResult } from "../llm/provider.js";
-import { explainWithProvider, type ProviderConfig } from "../llm/provider.js";
+import { explainWithProvider, isConfigured, type ProviderConfig } from "../llm/provider.js";
 import { buildUserPrompt, SYSTEM_PROMPT, MAX_CONTEXT_CHARS } from "../llm/prompt.js";
 
 export interface AnalysisResult {
@@ -123,4 +123,31 @@ export class CodeAnalyzer {
   cancel(): void {
     this.cycleAbort?.abort();
   }
+}
+
+export interface ExplainSourceOptions {
+  fileUri?: string;
+  maxConcurrent?: number;
+  /** Run the LLM to explain functions. Defaults to true when the provider is configured. */
+  explain?: boolean;
+}
+
+/**
+ * One-shot entry point: parse + extract + risk-scan `source`, and (unless
+ * disabled) explain each function with the configured provider. VS Code-free,
+ * so it is reused by the CLI, the extension, and the MCP server.
+ */
+export async function explainSource(
+  source: string,
+  kind: LanguageKind,
+  config: ProviderConfig,
+  options: ExplainSourceOptions = {}
+): Promise<AnalysisResult> {
+  const analyzer = new CodeAnalyzer(config);
+  const result = await analyzer.analyze(source, kind);
+  const wantExplain = options.explain ?? isConfigured(config);
+  if (wantExplain && isConfigured(config)) {
+    await analyzer.explainFunctions(result, options.fileUri ?? "", options.maxConcurrent ?? 2);
+  }
+  return result;
 }

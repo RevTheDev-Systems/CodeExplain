@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { languageForFile } from "./parser/treesitter.js";
 import { loadConfig, type ExplainConfig } from "./extension/config.js";
-import { CodeAnalyzer, type AnalysisResult } from "./extension/analyzer.js";
+import { CodeAnalyzer, type AnalysisResult } from "./core/explain.js";
 import { CodeExplainViewProvider } from "./extension/webview.js";
 import { isConfigured, explainWithProvider, type ExplainResult } from "./llm/provider.js";
 import { buildUserPrompt, SYSTEM_PROMPT } from "./llm/prompt.js";

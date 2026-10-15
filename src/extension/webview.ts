@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { AnalysisResult } from "./analyzer.js";
+import type { AnalysisResult } from "../core/explain.js";
 import type { ExplainResult } from "../llm/provider.js";
 
 function getNonce(): string {

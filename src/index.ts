@@ -24,3 +24,22 @@ export {
   type ProviderMode,
   type ExplainResult,
 } from "./llm/provider.js";
+export {
+  buildConfig,
+  readEnvConfig,
+  readFileConfig,
+  resolveConfig,
+  CONFIG_DEFAULTS,
+  ENV_KEYS,
+  DEFAULT_CONFIG_FILENAME,
+  type ExplainConfig,
+  type RawSettings,
+  type ResolveConfigOptions,
+} from "./core/config.js";
+export {
+  CodeAnalyzer,
+  explainSource,
+  type AnalysisResult,
+  type ExplainSourceOptions,
+} from "./core/explain.js";
+export { selectChangedUnits, type ChangedRange } from "./core/changes.js";
