@@ -29,6 +29,8 @@ export interface McpClient {
   defaultScope: "user" | "project";
   /** The per-server object written into a JSON container. */
   entry: (launch: Launch) => Record<string, unknown>;
+  /** Client-specific snippet renderer, preferred over the format default. */
+  snippet?: (serverName: string, launch: Launch) => string;
 }
 
 function home(...segments: string[]): string {
@@ -38,6 +40,12 @@ function home(...segments: string[]): string {
 function xdgConfig(...segments: string[]): string {
   const base = process.env.XDG_CONFIG_HOME || home(".config");
   return join(base, ...segments);
+}
+
+function dshHome(): string {
+  const env = process.env.DSH_HOME;
+  if (env && env.trim() !== "") return env;
+  return home(".dsh");
 }
 
 function plainEntry(launch: Launch): Record<string, unknown> {
@@ -137,6 +145,26 @@ export const CLIENTS: McpClient[] = [
     defaultScope: "user",
     entry: plainEntry,
   },
+  {
+    id: "hermes",
+    name: "Hermes Agent",
+    format: "yaml",
+    key: "mcp_servers",
+    userFile: () => home(".hermes", "config.yaml"),
+    defaultScope: "user",
+    entry: plainEntry,
+    snippet: (serverName, launch) => yamlMapSnippet("mcp_servers", serverName, launch),
+  },
+  {
+    id: "deepseek-harness",
+    name: "DeepSeek Harness",
+    format: "yaml",
+    key: "cordis.patch.yml",
+    userFile: () => join(dshHome(), "cordis.patch.yml"),
+    defaultScope: "user",
+    entry: plainEntry,
+    snippet: dshYamlSnippet,
+  },
 ];
 
 export function findClient(id: string): McpClient | undefined {
@@ -174,7 +202,34 @@ export function yamlSnippet(serverName: string, launch: Launch): string {
   ].join("\n");
 }
 
+export function yamlMapSnippet(key: string, serverName: string, launch: Launch): string {
+  const args = launch.args.map((a) => `      - ${JSON.stringify(a)}`).join("\n");
+  return [
+    `${key}:`,
+    `  ${serverName}:`,
+    `    command: ${launch.command}`,
+    `    args:`,
+    args,
+  ].join("\n");
+}
+
+export function dshYamlSnippet(serverName: string, launch: Launch): string {
+  const args = launch.args.map((a) => `        - ${JSON.stringify(a)}`).join("\n");
+  return [
+    `# Append to the cordis patch layer (a YAML list).`,
+    `- id: ${serverName}`,
+    `  name: '@deepseek-ai/dsh-mcp-client'`,
+    `  config:`,
+    `    serverName: ${serverName}`,
+    `    transport: stdio`,
+    `    command: ${launch.command}`,
+    `    args:`,
+    args,
+  ].join("\n");
+}
+
 export function renderSnippet(client: McpClient, serverName: string, launch: Launch): string {
+  if (client.snippet) return client.snippet(serverName, launch);
   if (client.format === "toml") return tomlSnippet(client, serverName, launch);
   if (client.format === "yaml") return yamlSnippet(serverName, launch);
   return jsonSnippet(client, serverName, launch);
@@ -416,9 +471,10 @@ export async function runInstall(argv: string[]): Promise<number> {
 
   if (args.list || !args.client) {
     console.log("Supported MCP clients:");
+    const width = Math.max(...CLIENTS.map((c) => c.id.length)) + 1;
     for (const c of CLIENTS) {
       const scopes = c.projectFile ? "user/project" : "user";
-      console.log(`  ${c.id.padEnd(10)} ${c.name} (${c.format}, ${scopes})`);
+      console.log(`  ${c.id.padEnd(width)} ${c.name} (${c.format}, ${scopes})`);
     }
     if (!args.client) {
       console.error("\nPick one with --client <id>.");

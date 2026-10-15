@@ -17,12 +17,16 @@ import {
 const launch: Launch = { command: "npx", args: ["-y", "code-explain", "mcp"] };
 
 let cwd: string;
+let prevDshHome: string | undefined;
 
 beforeEach(() => {
   cwd = mkdtempSync(join(tmpdir(), "ce-install-"));
+  prevDshHome = process.env.DSH_HOME;
 });
 
 afterEach(() => {
+  if (prevDshHome === undefined) delete process.env.DSH_HOME;
+  else process.env.DSH_HOME = prevDshHome;
   rmSync(cwd, { recursive: true, force: true });
 });
 
@@ -119,6 +123,25 @@ describe("buildPlan", () => {
       buildPlan({ client: "nope", launch, write: false, force: false, cwd })
     ).toThrow(/unknown client/i);
   });
+
+  it("resolves the hermes user config path", () => {
+    const plan = buildPlan({ client: "hermes", launch, write: false, force: false, cwd });
+    expect(plan.scope).toBe("user");
+    expect(plan.path.endsWith(join(".hermes", "config.yaml"))).toBe(true);
+  });
+
+  it("honors DSH_HOME for the deepseek harness config path", () => {
+    process.env.DSH_HOME = join(cwd, "dsh-home");
+    const plan = buildPlan({ client: "deepseek-harness", launch, write: false, force: false, cwd });
+    expect(plan.scope).toBe("user");
+    expect(plan.path).toBe(join(cwd, "dsh-home", "cordis.patch.yml"));
+  });
+
+  it("falls back to ~/.dsh when DSH_HOME is empty", () => {
+    process.env.DSH_HOME = "   ";
+    const plan = buildPlan({ client: "deepseek-harness", launch, write: false, force: false, cwd });
+    expect(plan.path.endsWith(join(".dsh", "cordis.patch.yml"))).toBe(true);
+  });
 });
 
 describe("rendering", () => {
@@ -170,6 +193,23 @@ describe("rendering", () => {
     expect(snippet).toContain("mcpServers:");
     expect(snippet).toContain("- name: code-explain");
     expect(snippet).toContain("command: npx");
+  });
+
+  it("renders a hermes YAML map", () => {
+    const snippet = renderSnippet(findClient("hermes")!, "code-explain", launch);
+    expect(snippet).toContain("mcp_servers:");
+    expect(snippet).toContain("  code-explain:");
+    expect(snippet).toContain("    command: npx");
+    expect(snippet).toContain('      - "-y"');
+  });
+
+  it("renders the deepseek harness cordis plugin entry", () => {
+    const snippet = renderSnippet(findClient("deepseek-harness")!, "code-explain", launch);
+    expect(snippet).toContain("- id: code-explain");
+    expect(snippet).toContain("name: '@deepseek-ai/dsh-mcp-client'");
+    expect(snippet).toContain("transport: stdio");
+    expect(snippet).toContain("command: npx");
+    expect(snippet).toContain('        - "-y"');
   });
 });
 

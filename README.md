@@ -11,6 +11,50 @@ CodeExplain is a harness that watches Python, JavaScript, and TypeScript source 
 - **On-demand deep dive** — select any code and ask for a full, pedagogical explanation.
 - **Model fallback** — uses a local model (Ollama) by default and falls back to a cloud API when needed.
 
+## Install & setup
+
+### Prerequisites
+
+| Requirement | Needed for | Notes |
+|---|---|---|
+| **Node.js 18+** | CLI + MCP server | Ships with `npx`; the CLI uses the built-in `fetch` API |
+| **VS Code 1.86+** | The extension / panel | Or any compatible editor (Cursor, Windsurf, …) |
+| **Ollama** *(optional)* | Local explanations | Default local model `llama3.1`; not needed for offline risk alerts |
+
+Risk alerts and the function/import list run **fully offline** — no model, no network.
+Explanations need either a local Ollama server or a cloud API key (see
+[settings](#using-the-extension)), and degrade gracefully when neither is reachable.
+
+### Option A — VS Code extension
+
+```sh
+npm install
+npm run build && npm run build:extension   # compile + bundle the extension
+npm run package                            # produces code-explain-<version>.vsix
+```
+
+Install the resulting `.vsix` via **Extensions → … → Install from VSIX…**, then open
+the **CodeExplain** view from the activity bar. Developers can instead press
+<kbd>F5</kbd> to launch an Extension Development Host.
+
+### Option B — CLI & coding agent (MCP)
+
+No install needed to try it:
+
+```sh
+npx -y code-explain mcp install --client cursor --scope project   # preview
+```
+
+From a local checkout, build once and point `--local` at the compiled CLI:
+
+```sh
+npm install && npm run build
+node dist/cli.js mcp install --client cursor --local "$PWD/dist/cli.js"
+```
+
+See [Use it from your coding agent](#use-it-from-your-coding-agent-mcp) for the full
+`mcp install` flow, supported agents, and the four MCP tools.
+
 ## Architecture
 
 The harness works in three layers:
