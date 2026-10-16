@@ -85,14 +85,10 @@ export async function explainWithProvider(
   }
 }
 
-function parseExplainResult(raw: string): Omit<ExplainResult, "provider"> {
-  const cleaned = raw
-    .replace(/```json|```/g, "")
-    .trim()
-    .replace(/^[^{\[]+/, "")
-    .replace(/[}\]]+$/, "");
+export function parseExplainResult(raw: string): Omit<ExplainResult, "provider"> {
+  const cleaned = raw.replace(/```json|```/gi, "").trim();
   try {
-    const obj = JSON.parse(cleaned) as Partial<Omit<ExplainResult, "provider">>;
+    const obj = JSON.parse(extractJsonObject(cleaned)) as Partial<Omit<ExplainResult, "provider">>;
     return {
       summary: obj.summary ?? "No summary returned.",
       risk: obj.risk ?? "none",
@@ -101,4 +97,17 @@ function parseExplainResult(raw: string): Omit<ExplainResult, "provider"> {
   } catch {
     return { summary: cleaned.slice(0, 500), risk: "none", level: "safe" };
   }
+}
+
+/**
+ * Slice out the first JSON object/array from `text`, so surrounding prose or
+ * stray braces do not break parsing. Returns the original text when no opening
+ * bracket is present.
+ */
+function extractJsonObject(text: string): string {
+  const start = text.search(/[{[]/);
+  if (start < 0) return text;
+  const close = text[start] === "{" ? "}" : "]";
+  const end = text.lastIndexOf(close);
+  return end > start ? text.slice(start, end + 1) : text.slice(start);
 }

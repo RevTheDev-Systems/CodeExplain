@@ -22,7 +22,9 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 export async function chatCompletion(
   opts: ChatCompletionOptions
 ): Promise<ChatCompletionResult> {
-  const url = new URL("/chat/completions", ensureTrailingSlash(opts.baseUrl));
+  // Relative path (no leading slash) so the base URL's path prefix (e.g. `/v1`)
+  // is preserved; a leading slash would resolve host-absolute and drop it.
+  const url = new URL("chat/completions", ensureTrailingSlash(opts.baseUrl));
 
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const controller = new AbortController();
