@@ -13,38 +13,23 @@ esbuild.mjs
 # Source maps.
 **/*.map
 
-# tsc's per-file ESM output is dead weight: the extension entry is dist/extension.cjs.
-dist/index.js
-dist/cli.js
-dist/extension.js
-dist/parser/**
-dist/llm/**
-dist/analyzer/**
-dist/extension/**
+# Only the bundled extension entry ships. tsc's per-file ESM output and the
+# bundled MCP server (dist/mcp.cjs, an npm-only entry point) are unused by the
+# extension host.
+dist/**
+!dist/extension.cjs
 
-# Native addon helpers are unused: grammars are loaded as WebAssembly.
-node_modules/node-addon-api/**
-node_modules/node-gyp-build/**
-
-# Keep only the grammar wasm + package manifests from the tree-sitter packages.
-node_modules/tree-sitter-*/src/**
-node_modules/tree-sitter-*/prebuilds/**
-node_modules/tree-sitter-*/bindings/**
-node_modules/tree-sitter-*/queries/**
-node_modules/tree-sitter-*/common/**
-node_modules/tree-sitter-*/typescript/**
-node_modules/tree-sitter-*/tsx/**
-node_modules/tree-sitter-*/node_modules/**
-node_modules/tree-sitter-*/grammar.js
-node_modules/tree-sitter-*/binding.gyp
-node_modules/tree-sitter-*/README.md
-node_modules/tree-sitter-*/LICENSE
-node_modules/tree-sitter-*/tree-sitter.json
-
-# web-tree-sitter: keep the CJS entry + runtime wasm only.
-node_modules/web-tree-sitter/debug/**
-node_modules/web-tree-sitter/web-tree-sitter.js
-node_modules/web-tree-sitter/web-tree-sitter.d.ts
-node_modules/web-tree-sitter/web-tree-sitter.d.cts
-node_modules/web-tree-sitter/README.md
-node_modules/web-tree-sitter/LICENSE
+# node_modules: ship only the extension's runtime dependency closure.
+# The bundle requires `vscode` (provided by the host) plus `web-tree-sitter`,
+# and resolves the grammar wasms by path, so the four package manifests stay.
+node_modules/**
+!node_modules/web-tree-sitter/package.json
+!node_modules/web-tree-sitter/web-tree-sitter.cjs
+!node_modules/web-tree-sitter/web-tree-sitter.wasm
+!node_modules/tree-sitter-python/package.json
+!node_modules/tree-sitter-python/tree-sitter-python.wasm
+!node_modules/tree-sitter-javascript/package.json
+!node_modules/tree-sitter-javascript/tree-sitter-javascript.wasm
+!node_modules/tree-sitter-typescript/package.json
+!node_modules/tree-sitter-typescript/tree-sitter-typescript.wasm
+!node_modules/tree-sitter-typescript/tree-sitter-tsx.wasm
