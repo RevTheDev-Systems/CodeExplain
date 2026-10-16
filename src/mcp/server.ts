@@ -24,9 +24,8 @@ import { buildUserPrompt, SYSTEM_PROMPT, MAX_CONTEXT_CHARS } from "../llm/prompt
 import { resolveConfig } from "../core/config.js";
 import { selectChangedUnits, type ChangedRange } from "../core/changes.js";
 import { gitChangedRanges, isTracked } from "../core/diff.js";
+import { VERSION } from "../version.js";
 
-// Kept in sync with package.json "version".
-const VERSION = "0.2.0";
 const SERVER_NAME = "code-explain";
 
 type ToolFormat = "text" | "json";
@@ -210,7 +209,7 @@ function renderList(loaded: Loaded): string {
   if (fns.length === 0) lines.push("  (none)");
   for (const f of fns) {
     const flags = [f.async ? "async" : "", f.method ? "method" : ""].filter(Boolean).join(", ");
-    lines.push(`  L${f.line}-${f.endLine}  ${f.name}(${f.params})${flags ? `  [${flags}]` : ""}`);
+    lines.push(`  L${f.line}-${f.endLine}  ${f.name}${f.params || "()"}${flags ? `  [${flags}]` : ""}`);
   }
 
   lines.push("\nassignments:");

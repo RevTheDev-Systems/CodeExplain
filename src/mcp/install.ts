@@ -459,20 +459,20 @@ export function parseInstallArgs(argv: string[]): ParsedInstallArgs {
   return out;
 }
 
-function printUsage(): void {
-  console.error("Usage: code-explain mcp install --client <id> [options]");
-  console.error("");
-  console.error("Options:");
-  console.error("  --client <id>       Target agent (see --list).");
-  console.error("  --scope <s>         user or project (default: client's own).");
-  console.error("  --server-name <n>   Name to register (default: code-explain).");
-  console.error("  --local <path>      Launch via `node <path>` instead of npx.");
-  console.error("  --write             Modify the config file (default: print only).");
-  console.error("  --force             Replace an existing entry when writing.");
-  console.error("  --list              List supported clients.");
-  console.error("");
-  console.error("By default the correct snippet and target path are printed without");
-  console.error("touching any file. Add --write to merge it in.");
+function printUsage(stream: (msg: string) => void = console.error): void {
+  stream("Usage: code-explain mcp install --client <id> [options]");
+  stream("");
+  stream("Options:");
+  stream("  --client <id>       Target agent (see --list).");
+  stream("  --scope <s>         user or project (default: client's own).");
+  stream("  --server-name <n>   Name to register (default: code-explain).");
+  stream("  --local <path>      Launch via `node <path>` instead of npx.");
+  stream("  --write             Modify the config file (default: print only).");
+  stream("  --force             Replace an existing entry when writing.");
+  stream("  --list              List supported clients.");
+  stream("");
+  stream("By default the correct snippet and target path are printed without");
+  stream("touching any file. Add --write to merge it in.");
 }
 
 export async function runInstall(argv: string[]): Promise<number> {
@@ -481,12 +481,12 @@ export async function runInstall(argv: string[]): Promise<number> {
     args = parseInstallArgs(argv);
   } catch (err) {
     console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-    printUsage();
+    printUsage(console.error);
     return 1;
   }
 
   if (args.help) {
-    printUsage();
+    printUsage(console.log);
     return 0;
   }
 
@@ -494,18 +494,20 @@ export async function runInstall(argv: string[]): Promise<number> {
     process.env.HOME = args.home;
   }
 
-  if (args.list || !args.client) {
+  if (args.list) {
     console.log("Supported MCP clients:");
     const width = Math.max(...CLIENTS.map((c) => c.id.length)) + 1;
     for (const c of CLIENTS) {
       const scopes = c.projectFile ? "user/project" : "user";
       console.log(`  ${c.id.padEnd(width)} ${c.name} (${c.format}, ${scopes})`);
     }
-    if (!args.client) {
-      console.error("\nPick one with --client <id>.");
-      return 1;
-    }
     return 0;
+  }
+
+  if (!args.client) {
+    console.error("Error: --client is required. Use --list to see supported clients.");
+    printUsage(console.error);
+    return 1;
   }
 
   const launch: Launch = args.local
@@ -550,7 +552,7 @@ export async function runInstall(argv: string[]): Promise<number> {
       console.log("");
       console.log(plan.snippet);
     }
-    return result.changed || plan.client.format === "yaml" ? 0 : 1;
+    return result.changed ? 0 : 1;
   } catch (err) {
     console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
     return 1;

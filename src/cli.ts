@@ -4,25 +4,40 @@ import { languageForFile, parse } from "./parser/treesitter.js";
 import { extractCodeUnits } from "./parser/extract.js";
 import { analyzeRisks } from "./analyzer/risks.js";
 import { buildUserPrompt, SYSTEM_PROMPT, MAX_CONTEXT_CHARS } from "./llm/prompt.js";
-import {
-  explainWithProvider,
-  isConfigured,
-  type ProviderConfig,
-} from "./llm/provider.js";
+import { explainWithProvider, isConfigured } from "./llm/provider.js";
+import { resolveConfig } from "./core/config.js";
+import { VERSION } from "./version.js";
 
 interface Args {
   files: string[];
   llm: boolean;
+  help: boolean;
+  version: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
   const files: string[] = [];
   let llm = false;
+  let help = false;
+  let version = false;
   for (const arg of argv) {
     if (arg === "--llm" || arg === "--explain") llm = true;
+    else if (arg === "--help" || arg === "-h") help = true;
+    else if (arg === "--version" || arg === "-v") version = true;
     else files.push(arg);
   }
-  return { files, llm };
+  return { files, llm, help, version };
+}
+
+function printUsage(stream: (msg: string) => void = console.log): void {
+  stream("Usage: code-explain <file.py|.js|.ts> [--llm]");
+  stream("       code-explain mcp           # start the MCP stdio server");
+  stream("       code-explain mcp install   # configure an MCP client");
+  stream("");
+  stream("Options:");
+  stream("  --llm, --explain   Also print model-written explanations.");
+  stream("  --help, -h         Show this help.");
+  stream("  --version, -v      Show the version.");
 }
 
 function buildContext(source: string): string {
@@ -50,23 +65,43 @@ export async function main(argv: string[]): Promise<number> {
 
   const args = parseArgs(argv.slice(2));
 
+  if (args.version) {
+    console.log(VERSION);
+    return 0;
+  }
+
+  if (args.help) {
+    printUsage(console.log);
+    return 0;
+  }
+
   if (args.files.length === 0) {
-    console.error("Usage: explain <file.py|.js|.ts> [--llm]");
-    console.error("       explain mcp           # start the MCP stdio server");
-    console.error("       explain mcp install   # configure an MCP client");
+    printUsage(console.error);
     return 1;
   }
 
-  const config: ProviderConfig = { mode: "auto" };
+  const config = resolveConfig().provider;
   const useLLM = args.llm && isConfigured(config);
 
+  let exitCode = 0;
   for (const file of args.files) {
     const kind = languageForFile(file);
     if (!kind) {
-      console.log(`${file}: unsupported language`);
+      console.error(`${file}: unsupported language (expected .py, .js, .jsx, .ts, .tsx)`);
+      exitCode = 1;
       continue;
     }
-    const source = readFileSync(file, "utf8");
+
+    let source: string;
+    try {
+      source = readFileSync(file, "utf8");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Error: cannot read ${file}: ${msg}`);
+      exitCode = 1;
+      continue;
+    }
+
     const tree = await parse(source, kind);
     const units = extractCodeUnits(tree.rootNode, kind);
 
@@ -88,7 +123,7 @@ export async function main(argv: string[]): Promise<number> {
     for (const u of units) {
       if (u.kind === "function") {
         const name = u.name ?? "(anonymous)";
-        console.log(`  L${u.startLine + 1}-${u.endLine + 1} function ${name}(${u.params})`);
+        console.log(`  L${u.startLine + 1}-${u.endLine + 1} function ${name}${u.params || "()"}`);
       } else if (u.kind === "assignment") {
         console.log(`  L${u.startLine + 1} assignment "${u.target}"`);
       } else {
@@ -112,7 +147,7 @@ export async function main(argv: string[]): Promise<number> {
     }
   }
 
-  return 0;
+  return exitCode;
 }
 
 // Allow `node dist/cli.js` and `tsx src/cli.ts` to work.

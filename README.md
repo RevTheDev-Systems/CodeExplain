@@ -19,7 +19,7 @@ CodeExplain is a harness that watches Python, JavaScript, and TypeScript source 
 
 | Requirement | Needed for | Notes |
 |---|---|---|
-| **Node.js 18+** | CLI + MCP server | Ships with `npx`; the CLI uses the built-in `fetch` API |
+| **Node.js 22+** | CLI + MCP server | Ships with `npx`; the CLI uses the built-in `fetch` API |
 | **VS Code 1.86+** | The extension / panel | Or any compatible editor (Cursor, Windsurf, …) |
 | **Ollama** *(optional)* | Local explanations | Default local model `llama3.1`; not needed for offline risk alerts |
 
@@ -111,7 +111,7 @@ Phase 5 — explain only what changed:
 - [x] Explanations cached by function signature, so repeat saves are free
 
 Phase 6 — distribution:
-- [x] `mcp install` prints/writes config for 9 agents (no file touched unless
+- [x] `mcp install` prints/writes config for 13 clients (no file touched unless
       `--write`); `--local` launches a local build without publishing
 - [x] Lean npm package (built `dist/` + docs) with executable `bin` entries
 
